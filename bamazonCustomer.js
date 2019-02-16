@@ -21,17 +21,18 @@ connection.connect(function(err) {
 });
 
 function afterConnection() {
-  connection.query(`SELECT item_id, product_name, department_name, price, stock_quantity
-                    FROM products`, function(err, res) {
-    if (err) throw err;
-    var ids = [];
-    for(var i = 0; i<res.length; i++){
-      var obj = res[i];
-      ids.push(obj.item_id.toString());
-      console.log(`| ${pad(obj.item_id, 3, true)} | ${pad(obj.product_name, 25)} | ${pad(obj.department_name, 15)} | $${pad(obj.price, 10, true)} | ${pad(obj.stock_quantity, 4, true)} |`)
-    }
-    customerOrder(ids, "Continue");
-  });
+  printProducts();
+  // connection.query(`SELECT item_id, product_name, department_name, price, stock_quantity
+  //                   FROM products`, function(err, res) {
+  //   if (err) throw err;
+  //   var ids = [];
+  //   for(var i = 0; i<res.length; i++){
+  //     var obj = res[i];
+  //     ids.push(obj.item_id.toString());
+  //     console.log(`| ${pad(obj.item_id, 3, true)} | ${pad(obj.product_name, 25)} | ${pad(obj.department_name, 15)} | $${pad(obj.price, 10, true)} | ${pad(obj.stock_quantity, 4, true)} |`)
+  //   }
+  //   customerOrder(ids, "Continue");
+  // });
 }
 
 function customerOrder(ids, status){
@@ -52,17 +53,17 @@ function customerOrder(ids, status){
         connection.query(`SELECT item_id, stock_quantity, price
                           FROM products
                           WHERE item_id = ${user.productId} 
-                          AND stock_quantity <= ${user.unitAmnt}`, (function(amnt){
+                          AND stock_quantity >= ${user.unitAmnt}`, (function(amnt){
             return function(err, res) {
               if (err) throw err;
               if(res.length > 0){
-                var remainingAmnt = res[0].stock_quantity - amnt;
+                var remainingAmnt = res[0].stock_quantity - parseInt(amnt);
                 console.log("Total cost of purchase: $"+amnt*res[0].price);
                 connection.query(`UPDATE products
                                   SET stock_quantity = ${remainingAmnt}
-                                  WHERE item_id = ${res.item_id};`, function(err, res) {
+                                  WHERE item_id = ${res[0].item_id};`, function(err, res) {
                   if (err) throw err;
-
+                  //console.log(res);
                 });
               }else{
                 console.log("Insufficient quantity!");
@@ -78,13 +79,29 @@ function customerOrder(ids, status){
                   status = user.status;
                   if(status === "Exit"){
                     connection.end();
+                    return;
                   }
-                  customerOrder(ids, status);
+                  printProducts();
                 });
             };
         })(user.unitAmnt));
       });
   }
+}
+
+function printProducts(){
+  const productsQry = `SELECT item_id, product_name, department_name, price, stock_quantity
+                       FROM products`
+  connection.query(productsQry, function(err, res) {
+    if (err) throw err;
+    var ids = [];
+    for(var i = 0; i<res.length; i++){
+    var obj = res[i];
+    ids.push(obj.item_id.toString());
+    console.log(`| ${pad(obj.item_id, 3, true)} | ${pad(obj.product_name, 25)} | ${pad(obj.department_name, 15)} | $${pad(obj.price, 10, true)} | ${pad(obj.stock_quantity, 4, true)} |`)
+    }
+    customerOrder(ids, "Continue");
+  });
 }
 
 function pad(str, totalSpace, numeric){
